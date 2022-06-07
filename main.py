@@ -97,7 +97,7 @@ class Elevator:
         self.has_button_down: bool = False
         self.going_up = True
         self.going_down = False
-        self.direct = "up"
+        self.direct = "down"
         self.steps: int = 0
         self.passengers_count: int = 0
         self.elev_passengers: List[Passenger] = []
@@ -111,11 +111,19 @@ class Elevator:
 
         for passenger in floor_passengers:
             # check whether the elevator is going up or down
-            if passenger.arrival_floor > current_floor and not (
-                passenger.arrival_floor == current_floor
-            ):
-                self.add_passenger(passenger)
-                newly_entered_passengers.append(passenger)
+            if self.direct == "up":
+                if passenger.arrival_floor > current_floor and not (
+                    passenger.arrival_floor == current_floor
+                ):
+                    self.add_passenger(passenger)
+                    newly_entered_passengers.append(passenger)
+
+            elif self.direct == "down":
+                if passenger.arrival_floor < current_floor and not (
+                    passenger.arrival_floor == current_floor
+                ):
+                    self.add_passenger(passenger)
+                    newly_entered_passengers.append(passenger)
 
         # remove the passenger so we don't have any dupliction in the
         # next iteration
@@ -143,10 +151,14 @@ class Elevator:
             self.elev_passengers.append(passenger)
             self.passengers_count += 1
 
-            # update max_floor if it's not bigger than the passenger'
-            # arrival floor
-            if not self.max_floor > passenger.arrival_floor:
-                self.max_floor = passenger.arrival_floor
+            # update max_floor or min_floor if it's not bigger than the
+            # passenger' arrival floor
+            if self.direct == "up":
+                if not self.max_floor > passenger.arrival_floor:
+                    self.max_floor = passenger.arrival_floor
+            elif self.direct == "down":
+                if not self.min_floor > passenger.arrival_floor:
+                    self.min_floor = passenger.arrival_floor
 
     def remove_passenger(self, passenger: Passenger):
         print(
@@ -169,15 +181,25 @@ class Elevator:
     def SetUp(self, floor: Floor):
         self.current_floor = floor.floor_num
 
-        if floor.floor_num > 1:
-            self.has_button_up = True
+    def move_up(
+        self,
+        floors: List[Floor],
+        start_floor: Floor = None,
+        is_reversed: bool = False,
+    ):
+        print("*" * 30)
+        print("Elevator is moving Up")
+        print("*" * 30)
 
-        if floor.floor_num == self.building_floors:
-            self.has_button_up = False
+        self.direct = "up"
 
-    def run(self):
-        floors = self.generate_floors()
-        self.display_floors_passenegers(floors)
+        if not is_reversed:
+            floors = sorted(
+                floors
+                if not start_floor
+                else floors[: floors.index(start_floor)],
+                key=lambda f: f.floor_num,
+            )
 
         for floor in floors:
             self.SetUp(floor)
@@ -195,23 +217,76 @@ class Elevator:
                 else floors[floor.floor_num]
             )
 
-            self.display(floor, prev_floor, next_floor)
+            if not self.is_elevator_empty:
+                self.display(floor, prev_floor, next_floor)
 
-            if floor.floor_num == self.max_floor:
-                break
+        self.direct = "down"
 
+    def move_down(
+        self,
+        floors: List[Floor],
+        start_floor: Floor = None,
+        is_reversed: bool = False,
+    ):
+        print("*" * 30)
+        print("Elevator is moving Down")
+        print("*" * 30)
+
+        self.direct = "down"
+
+        reversed_floors = sorted(
+            floors if not start_floor else floors[: floors.index(start_floor)],
+            key=lambda f: f.floor_num,
+            reverse=True,
+        )
+
+        for floor in reversed_floors:
+            self.SetUp(floor)
+            self.manage_entering_passengers(floor, floor.floor_num)
+            self.manage_leaving_passengers(self.elev_passengers)
+
+            prev_floor = (
+                None
+                if not index_in_list(floors, floor.floor_num - 2)
+                else floors[floor.floor_num - 2]
+            )
+            next_floor = (
+                None
+                if not index_in_list(floors, floor.floor_num)
+                else floors[floor.floor_num]
+            )
+
+            if not self.is_elevator_empty:
+                self.display(floor, prev_floor, next_floor)
+
+        self.direct = "up"
+
+    def run(self):
+        floors = self.generate_floors()
+        self.display_floors_passenegers(floors)
+        self.move_down(floors)
+
+        while self.is_passengers_exists(floors):
+            if self.direct == "up":
+                self.move_up(floors)
+            elif self.direct == "down":
+                self.move_down(floors)
+
+    @property
     def is_elevator_empty(self):
         return len(self.elev_passengers) == 0
+
+    def is_passengers_exists(self, floors: List[Floor]):
+        for floor in floors:
+            if len(floor.passengers) > 0:
+                return True
+
+        return False
 
     def find_nearest_floor_with_passengers(
         self, floor: Floor, floors: List[Floor]
     ):
         floor_indx = floors.index(floor)
-
-
-
-    def move_up(self):
-        pass
 
     ############### Program UI ###############
     def display(
@@ -277,11 +352,13 @@ class Elevator:
             (len(dashes_string) - len(next_floor_emoji_string)) + 1
         ) * " "
 
-        footer = (
-            "Direction: "
-            + emoji.emojize(":up_arrow: ", language="en")
-            + f" Floor: {floor.floor_num}"
+        direction_emoji = (
+            emoji.emojize(":up_arrow: ", language="en")
+            if self.direct == "up"
+            else emoji.emojize(":down_arrow: ", language="en")
         )
+
+        footer = "Direction: " + direction_emoji + f" Floor: {floor.floor_num}"
         fins = "|"
 
         print()
