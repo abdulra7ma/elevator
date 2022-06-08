@@ -4,7 +4,7 @@ from typing import Iterator, List
 
 import emoji
 
-from helpers import index_in_list, bcolors
+from helpers import bcolors, index_in_list
 
 
 class Floor:
