@@ -1,43 +1,23 @@
 import itertools
 from random import randint
-from typing import List
+from typing import Iterator, List
 
 import emoji
 
 from helpers import index_in_list, bcolors
 
 
-class Building:
-    def __init__(self, counter) -> None:
-        self.counter = counter
-
-    @property
-    def floors(cls):
-        """
-        Returns a random number between 5 and 20
-        """
-        return randint(5, 20)
-
-
-class Passenger:
-    def __init__(self, floor_num, id, arrival_floor: int) -> None:
-        self.floor_num = floor_num
-        self._id = id
-        self.arrival_floor = arrival_floor
-
-    @property
-    def id(self):
-        return self._id
-
-    @id.setter
-    def id(self, id):
-        self._id = id
-
-    def __str__(self) -> str:
-        return f"P{self.id} -> {self.arrival_floor}"
-
-
 class Floor:
+    """
+    Defines the basic attribtes for any Floor and generates passengers objects
+    for the task algorithm
+
+    Attributes:
+        floor_num ->  numerical identifier of the floor object
+        building_floors_num ->  Number for floors in the building
+        counter -> Iterable object for Passenger IDs generation
+    """
+
     def __init__(
         self, floor_num: int, building_floors_num: int, counter
     ) -> None:
@@ -68,21 +48,84 @@ class Floor:
 
     def arrival_floor(self):
         """
-        Returns random arrival floor if it's not equal to the current floor
+        Returns random arrival floor for a passenger,
+        if it's not equal to the current floor
         """
-        while True:
+        arrival_floor = self.generate_random_arrival_floor_for_passenger()
+
+        while arrival_floor == self.floor_num:
             arrival_floor = self.generate_random_arrival_floor_for_passenger()
-            if arrival_floor != self.floor_num:
-                try:
-                    return arrival_floor
-                except ValueError:
-                    pass
+
+        return arrival_floor
 
     def __str__(self) -> str:
         return f"F{self.floor_num}"
 
 
+class Building:
+    """
+    Generates random number for the building floors
+    and creates corresponding Floor objects to the generated random floor number
+    """
+
+    def __init__(self, counter: Iterator) -> None:
+        self.counter = counter
+
+    @property
+    def floors(self) -> int:
+        """
+        Returns a random number between 5 and 20
+        """
+        return randint(5, 20)
+
+    def generate_floors(self) -> List[Floor]:
+        """
+        Generates a random number of Floors objects between 1 and the random
+        generated floors
+        """
+        floors_list = []
+
+        building_floor = self.floors
+
+        for floor_num in range(1, building_floor):
+            floors_list.append(Floor(floor_num, building_floor, self.counter))
+
+        return floors_list
+
+
+class Passenger:
+    """
+    Defines the basic attribtes for any passenger
+
+    Attributes:
+        floor_num -> floor number where the passenger requests the elevator
+        id -> unique identifier to enhance the visual presentation on the board
+        arrival_floor -> passenger' arrival destination
+    """
+
+    def __init__(self, floor_num, id, arrival_floor: int) -> None:
+        self.floor_num = floor_num
+        self._id = id
+        self.arrival_floor = arrival_floor
+
+    @property
+    def id(self) -> int:
+        return self._id
+
+    @id.setter
+    def id(self, id) -> None:
+        self._id = id
+
+    def __str__(self) -> str:
+        return f"P{self.id} -> {self.arrival_floor}"
+
+
 class Board:
+    """
+    Board class is logical translation board where it turns the Elevator logic
+    into a visual representation on the terminal
+    """
+
     def display(
         self,
         floor: Floor,
@@ -90,8 +133,31 @@ class Board:
         previous_floor: Floor = None,
         next_floor: Floor = None,
         direct: str = "up",
-    ):
+    ) -> None:
+        """
+        Takes a number of elevator attributes and turn them into visual
+        representation
 
+        Parameter:
+            floor -> current floor object the elevator exists
+            elev_passengers -> list of passengers in the elevator
+            previous_floor -> previous floor
+            next_floor -> next floor
+            direct -> elevator direction [up or down]. Default is UP
+
+        Output:
+            ...
+            Direction: ⬇️  Floor: 3
+            |----------------------------------------------------------------------------------------------------------------|
+            |F2|                                            | 🕵️ 11-> 4  🔼  🕵️ 12-> 4  🔼  🕵️ 14-> 1  🔽  🕵️ 15-> 1  🔽        |
+            |----------------------------------------------------------------------------------------------------------------|
+            |F3|  🕵️ P17 -> 2  🕵️ P18 -> 2  🕵️ P21 -> 1  ⬅️  |                                                                |
+            |----------------------------------------------------------------------------------------------------------------|
+            |F4|                                            | 🕵️ 22-> 2  🔽  🕵️ 24-> 1  🔽  🕵️ 25-> 1  🔽                      |
+            |----------------------------------------------------------------------------------------------------------------|
+            ...
+
+        """
         emoji_string = "  ".join(
             [
                 emoji.emojize(":detective: ", language="en") + p.__str__()
@@ -294,9 +360,7 @@ class Board:
         print()
 
     def display_elevator_meta_data_passenegers(self, floors: List[Floor]):
-        print("*" * 20)
-        print("PASSENGERS IN EACH FLOOR")
-        print("*" * 20)
+        self.pop_up_text("PASSENGERS IN EACH FLOOR")
 
         for floor in floors:
             print(floor, " : ", end=" ")
@@ -307,9 +371,11 @@ class Board:
             print()
 
     def pop_up_text(self, text):
+        print()
         print("*" * 30)
         print(bcolors.OKCYAN, text, bcolors.ENDC)
         print("*" * 30)
+        print()
 
     def inline_text(self, text: str, color: str = None):
         if color == "red":
@@ -395,18 +461,6 @@ class Elevator:
             color="red",
         )
         self.passengers_count -= 1
-
-    def generate_floors(self) -> List[Floor]:
-        floors_list = []
-
-        building_floor = self.building.floors
-
-        for floor_num in range(1, building_floor):
-            floors_list.append(
-                Floor(floor_num, building_floor, self.building.counter)
-            )
-
-        return floors_list
 
     def SetUp(self, floor: Floor):
         self.current_floor = floor.floor_num
@@ -500,6 +554,10 @@ class Elevator:
         self.direct = "up"
 
     def is_passengers_exists(self, floors: List[Floor]):
+        """
+        Checks whether there's a waiting passenger for the elevator in the
+        or not.
+        """
         for floor in floors:
             if len(floor.passengers) > 0:
                 return True
@@ -513,9 +571,9 @@ class Elevator:
 
     def run(self):
         """
-        Runs the elevator until there's no 
+        Runs the elevator until there's no
         """
-        floors = self.generate_floors()
+        floors = self.building.generate_floors()
         self.board.display_elevator_meta_data_passenegers(floors)
 
         while self.is_passengers_exists(floors):
