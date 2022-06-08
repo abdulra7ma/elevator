@@ -56,6 +56,7 @@ pip install -r requirements.txt
 3. each step it shows the current floor and another two floors previous and next, Respectively.
    1. ⬅️ -> points to current floor
    2. 🔼 or 🔽 determine wheather the passenger want to go up or down
+   3. passengers to the right of the previous and next floors are the one waiting to take the elevator
 
 ```
 ...
